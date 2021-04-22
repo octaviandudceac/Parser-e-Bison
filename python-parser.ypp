@@ -1,0 +1,241 @@
+    // Require a modern version of Bison
+%require "3.5"
+
+// Generate C++ code
+%language "c++"
+
+// Use a type-save variant data structure for storing values
+%define api.value.type variant
+
+// Generate the various `make_<TOKEN>` functions
+%define api.token.constructor
+
+// Include the common interfaces in the generated header
+%code requires {
+    #include "common.hpp"
+}
+
+// Declare the `yylex` method, which will be defined in the lexer
+%code {
+    YY_DECL;
+}
+
+%%
+%token NEWLINE;
+%token CLASS_KEYWORD;
+%token AS_KEYWORD;
+%token IMPORT_KEYWORD;
+%token IF_KEYWORD;
+%token WHILE_KEYWORD;
+%token RETURN_KEYWORD;
+%token DEF_KEYWORD;
+%token PRINT_KEYWORD;
+
+%token OPEN_PARENS;
+%token CLOSE_PARENS;
+%token OPEN_BRACKET;
+%token CLOSE_BRACKET;
+%token OPEN_SQUARE_BRACKET;
+%token CLOSE_SQUARE_BRACKET;
+%token EQUALS;
+%token COMMA;
+%token DOT;
+%token PLUS;
+%token MINUS;
+%token LESS_THAN;
+%token GREATER_THAN;
+%token YYEOF;
+%token COLON;
+%token TAB;
+
+// Operator precedence
+%left LESS_THAN GREATER_THAN;
+%left PLUS MINUS;
+
+%token <std::string> IDENTIFIER;
+%token <int> NUMBER;
+%token <std::string> STRING;
+
+statements:
+    %empty | statement statements
+statement:
+    variable_declaration
+    | assignment
+    | if_statement
+    | while_statement
+    | return_statement
+    | print_statement
+    | method_definition
+    | import_statement
+    | newline
+    | tab_statements
+
+newline:
+    NEWLINE
+    {
+        // std::cout<<"new line\n";
+    }
+import_statement:
+    IMPORT_KEYWORD variable optional_as optional_name newline
+    {
+        std::cout<<"import block\n";
+    }
+    
+print_statement:
+    PRINT_KEYWORD OPEN_PARENS expression CLOSE_PARENS
+    {
+        std::cout << "Printing" << "\n";
+    }
+
+optional_as:
+    %empty
+    | AS_KEYWORD
+
+optional_name:
+    %empty
+    | variable
+
+if_keyword_cout:
+    IF_KEYWORD
+    {
+        std::cout << "If started\n";   
+    }
+
+while_keyword_cout:
+    WHILE_KEYWORD
+    {
+        std::cout << "While started\n";
+    }
+
+if_statement:
+    if_keyword_cout condition colon_newline 
+    tab_statements
+    {
+        std::cout << "End of if block\n";
+    }
+    
+
+tab_statements:
+     tab_statement tab_statements
+    | tab_statement newline tab_statements 
+    | %empty
+    
+
+tab_statement:
+    TAB statement 
+    {
+        // std::cout<<"TAB\t";
+    }
+
+colon_newline:
+    COLON NEWLINE
+
+while_statement:
+    while_keyword_cout condition colon_newline
+    tab_statements
+    {
+        std::cout << "End of while block\n";
+    }
+
+condition:
+    expression 
+
+variable_declaration:
+    variable optional_initializer 
+    {
+        std::cout << "Defining variable " << $1 << '\n';
+    }
+
+assignment:
+    variable initializer newline
+    {
+        std::cout << "assigning to variable " << '\n';
+    }
+
+return_statement:
+    RETURN_KEYWORD
+    | RETURN_KEYWORD expression 
+    {
+        std::cout << "Return value\n";
+    }
+
+
+%nterm expression;
+expression:
+    expression PLUS expression
+    | expression MINUS expression
+    | expression LESS_THAN expression
+    | expression GREATER_THAN expression
+    | IDENTIFIER
+    | variable
+    | literal
+
+method_definition:
+    DEF_KEYWORD IDENTIFIER OPEN_PARENS method_arguments CLOSE_PARENS COLON
+    {
+        std::cout << "Defining method " << '\n';
+    }
+    
+method_arguments:
+    %empty
+    | argument
+    | argument COMMA method_arguments
+
+argument:
+    IDENTIFIER
+
+
+%nterm <std::string> variable;
+variable:
+    IDENTIFIER
+    | NUMBER
+    | list
+    | tuple
+
+list:
+    OPEN_SQUARE_BRACKET listItems CLOSE_SQUARE_BRACKET
+    {
+        std::cout<<"List ";
+    } 
+    
+tuple:
+    OPEN_PARENS listItems CLOSE_PARENS{
+        std::cout<<"Tuple ";
+    }
+
+listItems:
+    variable
+    | listItems COMMA listItems
+
+optional_initializer:
+    %empty | initializer
+
+initializer:
+    EQUALS expression
+
+%nterm <std::string> literal;
+literal:
+    STRING | NUMBER
+    { $$ = std::to_string($1); }
+
+%%
+
+namespace yy
+{
+    // Report an error to the user.
+    void parser::error(const std::string& message)
+    {
+        std::cerr << message << '\n';
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc > 1)
+    {
+        freopen(argv[1], "r", stdin);
+    }
+
+    yy::parser python_parser;
+    return python_parser();
+}
